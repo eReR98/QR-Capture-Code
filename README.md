@@ -3,4 +3,4 @@ This is the repo containing the capture code for the QR code project. Project Ov
 
 Buildroot repo [here](https://github.com/cu-ecen-aeld/final-project-eReR98)
 
-Issue tracker [here](https://github.com/users/eReR98/projects/2)
+Issue tracker [here](https://github.com/users/eReR98/projects/2) 
