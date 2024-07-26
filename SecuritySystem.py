@@ -1,3 +1,5 @@
+# This is the start of the security system code. Currently only captures an image
+
 import cv2
 
 cam = cv2.VideoCapture(0)
