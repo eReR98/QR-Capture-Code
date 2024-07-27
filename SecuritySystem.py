@@ -27,14 +27,16 @@ while(True):
     ret, frame = cam.read()
 
     currTime=time.time()
-    
+
     if PrintFrameTime:
+        outstr = "Frame time is {0:.2f} ms, about {1:.2f} fps".format((currTime-prevTime)*1000, 1.0/(currTime-prevTime))
         print("Frame time is " + str(currTime-prevTime))
 
     prevTime=currTime
 
     if not ret:
         print("error capturing image")
+
 
     #cv2.imwrite("I_am_a_test_image.png", frame)
 
