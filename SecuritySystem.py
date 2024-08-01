@@ -4,19 +4,31 @@ import cv2
 import atexit
 import time
 import syslog
+import pigpio
 
 
 # Define control variables here
 PrintFrameTime = False
 PrintQRVal = True
-PrintSyslog = True
+PrintSyslog = False
+
+servoOpenPos = 2300
+servoClosePos = 600
+servoPin = 12
+
+sleepTime = 15.0
 
 prevTime = time.time()
 currTime = time.time()
 
+# Dictionary of users
+approvedUsers = {'eReR98Password' : 'eReR98', 'Dougie1234' : 'Doug'}
+
 # Setup Code
 cam = cv2.VideoCapture(0) # camera object
 detector = cv2.QRCodeDetector() # QR code detector for the captured frame
+pi_GPIO = pigpio.pi() # pigpio object for handling hardware PWM and servo control
+pi_GPIO.set_mode(servoPin, pigpio.OUTPUT) # setting servo pin to output
 
 # Handles keyboard interrupts and other exit signals
 def exitHandler():
@@ -30,9 +42,17 @@ def printHandler(inStr):
     else:
         print(inStr)
 
+def openDoor():
+    pi_GPIO.set_servo_pulsewidth(servoPin, servoOpenPos)
+
+def closeDoor():
+    pi_GPIO.set_servo_pulsewidth(servoPin, servoClosePos)
+
 atexit.register(exitHandler)
 
 printHandler("starting security system")
+
+closeDoor()
 
 # Program Loop
 while(True):
@@ -61,11 +81,28 @@ while(True):
         outstr = "QR code(s) detected. Num Found: {0}, Decoded vals: ".format(len(decodeInfo))
 
         if len(decodeInfo[0]) == 0:
-            printHandler("QR code(s) found. Could not decode")
+            if PrintQRVal:
+                printHandler("QR code(s) found. Could not decode")
         else:
-            for decodedString in decodeInfo:
-                outstr = outstr + decodedString + " "
-            printHandler(outstr)
+            for userKey in decodeInfo:
+                outstr = outstr + userKey + " "
+
+                if userKey in approvedUsers:
+                    printHandler("Welcome "+approvedUsers[userKey]+", opening door now")
+
+                    openDoor()
+
+                    time.sleep(sleepTime)
+
+                    closeDoor()
+
+                    printHandler("Closing Door")
+                else:
+                    printHandler("User not authorized")
+
+            if PrintQRVal:
+                printHandler(outstr)
+
 
 
     
