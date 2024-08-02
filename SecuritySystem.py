@@ -21,6 +21,11 @@ servoOpenPos = 2300
 servoClosePos = 600
 servoPin = 12
 
+# Button Params
+buttonPin = 17
+buttonStatePrev = False
+buttonState = False
+
 # LCD params
 
 LCD_D4 = 25
@@ -151,10 +156,13 @@ def resetText():
 
 # Setup Code
 cam = cv2.VideoCapture(0) # camera object
+
 detector = cv2.QRCodeDetector() # QR code detector for the captured frame
 
 pi_GPIO = pigpio.pi() # pigpio object for handling hardware PWM and servo control
 pi_GPIO.set_mode(servoPin, pigpio.OUTPUT) # setting servo pin to output
+
+
 
 atexit.register(exitHandler)
 
@@ -164,6 +172,9 @@ closeDoor()
 
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
+
+GPIO.setup(buttonPin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 GPIO.setup(LCD_E, GPIO.OUT)
 GPIO.setup(LCD_RS, GPIO.OUT)
 GPIO.setup(LCD_D4, GPIO.OUT)
@@ -176,6 +187,16 @@ resetText()
 
 # Program Loop
 while(True):
+
+    if GPIO.input(buttonPin) and not buttonState:
+       printHandler("now accepting new codes")
+       lcd_string("Scan new code", LCD_LINE1)
+       lcd_string("+++++++++", LCD_LINE2)
+       buttonState=True
+    elif not GPIO.input(buttonPin) and buttonState:
+       printHandler("resuming normal operation")
+       resetText()
+       buttonState=False
 
     # captures a frame from the camera
     ret, frame = cam.read()
@@ -193,6 +214,7 @@ while(True):
 
     prevTime=currTime
 
+
     # Runs frame through QR detector and decodes any detected codes
     ret, decodeInfo, points, qrcodeInfo = detector.detectAndDecodeMulti(frame)
 
@@ -206,32 +228,54 @@ while(True):
             if PrintQRVal:
                 printHandler("QR code(s) found. Could not decode")
         else:
-            for userKey in decodeInfo:
-                outstr = outstr + userKey + " "
 
-                # Checks if password is in the dictionary
-                if userKey in approvedUsers:
-                    printHandler("Welcome "+approvedUsers[userKey]+", opening door now")
+            if buttonState:
+                for userKey in decodeInfo:
+                   if userKey not in approvedUsers:
+                        approvedUsers.update({userKey : "New User"})
+                        printHandler("adding user with passcode: "+ userKey)
 
-                    # prints to LCD
-                    lcd_string("Welcome", LCD_LINE1)
-                    lcd_string(approvedUsers[userKey], LCD_LINE2)
+            else:
 
-                    openDoor()
+                for userKey in decodeInfo:
+                    outstr = outstr + userKey + " "
 
-                    time.sleep(openTime)
+                    # Checks if password is in the dictionary
+                    if userKey in approvedUsers:
+                        printHandler("Welcome "+approvedUsers[userKey]+", opening door now")
 
-                    resetText()
+                        # prints to LCD
+                        lcd_string("Welcome", LCD_LINE1)
+                        lcd_string(approvedUsers[userKey], LCD_LINE2)
 
-                    closeDoor()
+                        openDoor()
 
-                    printHandler("Closing Door")
-                else:
-                    printHandler("User not authorized")
-                    lcd_string("Access Denied", LCD_LINE1)
-                    lcd_string("XXXXXXXX", LCD_LINE2)
-                    time.sleep(scanDelay)
-                    resetText()
+                        #time.sleep(openTime)
+                        currTime = time.time()
+                        stopTime = currTime + openTime
+
+                        while(stopTime > currTime):
+                           ret, frame = cam.read()
+                           currTime = time.time()
+                        
+                        resetText()
+
+                        closeDoor()
+
+                        printHandler("Closing Door")
+                    else:
+                        printHandler("User not authorized")
+                        lcd_string("Access Denied", LCD_LINE1)
+                        lcd_string("XXXXXXXX", LCD_LINE2)
+
+                        currTime = time.time()
+                        stopTime = currTime + scanDelay
+
+                        while(stopTime > currTime):
+                           ret, frame = cam.read()
+                           currTime = time.time()
+
+                        resetText()
 
             if PrintQRVal:
                 printHandler(outstr)
