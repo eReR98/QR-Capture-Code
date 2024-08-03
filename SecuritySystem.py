@@ -1,5 +1,9 @@
 # Security system code, written in Python. 
 # 
+# Aaron
+# Github username: eReR98
+# for ECEA 5307 
+# 
 # LCD code used from Matt Hawkins and Leon Anavi for interfacing with i2c display. 
 # Reference code here (https://github.com/leon-anavi/raspberrypi-lcd/blob/master/raspberrypi-lcd.py)
 
@@ -9,6 +13,9 @@ import time
 import syslog
 import pigpio
 import RPi.GPIO as GPIO
+import logging
+import datetime
+
 
 
 # Define control variables here
@@ -185,6 +192,11 @@ GPIO.setup(LCD_D7, GPIO.OUT)
 lcd_init()
 resetText()
 
+curr_datetime = datetime.datetime.now()
+
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG, filename="AccessLog-" + curr_datetime.strftime("%d") + "-" + curr_datetime.strftime("%b") + "-" + curr_datetime.strftime("%Y") + "-" + curr_datetime.strftime("%X") + ".txt")
+logging.info("**********Security System Startup***************")
+
 # Program Loop
 while(True):
 
@@ -193,16 +205,19 @@ while(True):
        lcd_string("Scan new code", LCD_LINE1)
        lcd_string("+++++++++", LCD_LINE2)
        buttonState=True
+       logging.info("System entered new user logging mode")
     elif not GPIO.input(buttonPin) and buttonState:
        printHandler("resuming normal operation")
        resetText()
        buttonState=False
+       logging.info("System returned to normal operation")
 
     # captures a frame from the camera
     ret, frame = cam.read()
 
     if not ret:
         printHandler("error capturing image")
+        logging.error("Unable to capture image from cam.read()")
         break
 
     # Timing code for checking frametime and timestamp creation
@@ -222,11 +237,12 @@ while(True):
     if ret:
 
         outstr = "QR code(s) detected. Num Found: {0}, Decoded vals: ".format(len(decodeInfo))
-
+        
         # if decodeInfo is empty, then the full QR code was not read, do nothing
         if len(decodeInfo[0]) == 0:
             if PrintQRVal:
                 printHandler("QR code(s) found. Could not decode")
+                logging.info("Detected partial QR Code")
         else:
 
             if buttonState:
@@ -234,6 +250,7 @@ while(True):
                    if userKey not in approvedUsers:
                         approvedUsers.update({userKey : "New User"})
                         printHandler("adding user with passcode: "+ userKey)
+                        logging.info("New User with passcode: " + userKey + " added")
 
             else:
 
@@ -243,6 +260,8 @@ while(True):
                     # Checks if password is in the dictionary
                     if userKey in approvedUsers:
                         printHandler("Welcome "+approvedUsers[userKey]+", opening door now")
+
+                        logging.info("User: " + approvedUsers[userKey] + " opened the lock")
 
                         # prints to LCD
                         lcd_string("Welcome", LCD_LINE1)
@@ -267,6 +286,8 @@ while(True):
                         printHandler("User not authorized")
                         lcd_string("Access Denied", LCD_LINE1)
                         lcd_string("XXXXXXXX", LCD_LINE2)
+
+                        logging.info("Unauthorized code scanned. Decoded userKey: " + userKey)
 
                         currTime = time.time()
                         stopTime = currTime + scanDelay
