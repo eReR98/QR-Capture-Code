@@ -15,7 +15,7 @@ import pigpio
 import RPi.GPIO as GPIO
 import logging
 import datetime
-
+import hashlib
 
 
 # Define control variables here
@@ -58,9 +58,8 @@ scanDelay = 5.0
 prevTime = time.time()
 currTime = time.time()
 
-# Dictionary of users
-approvedUsers = {'eReR98Password' : 'eReR98', 'Dougie1234' : 'Doug'}
-
+# Dictionary of users. It just stores the sha256 hash of the QR code
+approvedUsers = {'cacf45f2f0e7a960070502c0143d98b2f6937a68cd979315eba3019e90def31a' : 'eReR98', '7e033c8aba06c192c441bab89677f7e724310a2c78595411937a601b471a6e13' : 'Dougie'}
 # all functions starting with lcd_ are borrowed from the lcd code mentioned
 # at the top of this file
 
@@ -160,6 +159,13 @@ def resetText():
     lcd_string("Door Locked", LCD_LINE1)
     lcd_string("Show code", LCD_LINE2)
 
+# turns string into a hash
+def getHash(inStr):
+   hasher = hashlib.sha256()
+   hasher.update((inStr.encode()))
+   retHash = hasher.hexdigest()
+   del hasher
+   return retHash
 
 # Setup Code
 cam = cv2.VideoCapture(0) # camera object
@@ -236,70 +242,80 @@ while(True):
     # if the detector finds a QR code
     if ret:
 
-        outstr = "QR code(s) detected. Num Found: {0}, Decoded vals: ".format(len(decodeInfo))
+
         
-        # if decodeInfo is empty, then the full QR code was not read, do nothing
-        if len(decodeInfo[0]) == 0:
-            if PrintQRVal:
-                printHandler("QR code(s) found. Could not decode")
-                logging.info("Detected partial QR Code")
-        else:
+      # if decodeInfo is empty, then the full QR code was not read, do nothing
+      if len(decodeInfo[0]) == 0:
+          if PrintQRVal:
+              printHandler("QR code(s) found. Could not decode")
+              logging.info("Detected partial QR Code")
+      else:
 
-            if buttonState:
-                for userKey in decodeInfo:
-                   if userKey not in approvedUsers:
-                        approvedUsers.update({userKey : "New User"})
-                        printHandler("adding user with passcode: "+ userKey)
-                        logging.info("New User with passcode: " + userKey + " added")
+          if buttonState:
+              for userKey in decodeInfo:
+                  
+                userKeyHash = getHash(userKey)
 
-            else:
+                del userKey
 
-                for userKey in decodeInfo:
-                    outstr = outstr + userKey + " "
+                if userKeyHash not in approvedUsers:
+                      
+                    approvedUsers.update({userKeyHash : "New User"})
+                    printHandler("adding user with passcode hash: "+ userKeyHash)
+                    logging.info("New User with passcode hash: " + userKeyHash)
 
-                    # Checks if password is in the dictionary
-                    if userKey in approvedUsers:
-                        printHandler("Welcome "+approvedUsers[userKey]+", opening door now")
+          else:
 
-                        logging.info("User: " + approvedUsers[userKey] + " opened the lock")
+              for userKey in decodeInfo:
+                  
+                  userKeyHash = getHash(userKey)
+                  
 
-                        # prints to LCD
-                        lcd_string("Welcome", LCD_LINE1)
-                        lcd_string(approvedUsers[userKey], LCD_LINE2)
+                  # Checks if password is in the dictionary
+                  if userKeyHash in approvedUsers:
+                      del userKey
+                      printHandler("Welcome "+approvedUsers[userKeyHash]+", opening door now")
 
-                        openDoor()
+                      logging.info("User: " + approvedUsers[userKeyHash] + " opened the lock")
 
-                        #time.sleep(openTime)
-                        currTime = time.time()
-                        stopTime = currTime + openTime
+                      # prints to LCD
+                      lcd_string("Welcome", LCD_LINE1)
+                      lcd_string(approvedUsers[userKeyHash], LCD_LINE2)
 
-                        while(stopTime > currTime):
-                           ret, frame = cam.read()
-                           currTime = time.time()
-                        
-                        resetText()
+                      openDoor()
 
-                        closeDoor()
+                      #time.sleep(openTime)
+                      currTime = time.time()
+                      stopTime = currTime + openTime
 
-                        printHandler("Closing Door")
-                    else:
-                        printHandler("User not authorized")
-                        lcd_string("Access Denied", LCD_LINE1)
-                        lcd_string("XXXXXXXX", LCD_LINE2)
+                      while(stopTime > currTime):
+                          ret, frame = cam.read()
+                          currTime = time.time()
+                      
+                      resetText()
 
-                        logging.info("Unauthorized code scanned. Decoded userKey: " + userKey)
+                      closeDoor()
 
-                        currTime = time.time()
-                        stopTime = currTime + scanDelay
+                      printHandler("Closing Door")
+                  else:
+                      printHandler("User not authorized")
+                      lcd_string("Access Denied", LCD_LINE1)
+                      lcd_string("XXXXXXXX", LCD_LINE2)
 
-                        while(stopTime > currTime):
-                           ret, frame = cam.read()
-                           currTime = time.time()
+                      logging.info("Unauthorized code scanned. Decoded userKey: " + userKey)
+                      
+                      del userKey
 
-                        resetText()
+                      currTime = time.time()
+                      stopTime = currTime + scanDelay
 
-            if PrintQRVal:
-                printHandler(outstr)
+                      while(stopTime > currTime):
+                          ret, frame = cam.read()
+                          currTime = time.time()
+
+                      resetText()
+
+      del decodeInfo  
 
 cam.release()
 
