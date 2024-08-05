@@ -265,7 +265,7 @@ while(True):
                     logging.info("New User with passcode hash: " + userKeyHash)
 
                     currTime = time.time()
-                    stopTime = currTime + stopTime
+                    stopTime = currTime + 5
                     lcd_string("New User", LCD_LINE1)
                     lcd_string("Added", LCD_LINE2)
 
