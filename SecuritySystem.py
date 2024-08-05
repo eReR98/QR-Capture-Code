@@ -21,7 +21,7 @@ import hashlib
 # Define control variables here
 PrintFrameTime = False
 PrintQRVal = True
-PrintSyslog = False
+PrintSyslog = True
 
 # Servo Params
 servoOpenPos = 2300
