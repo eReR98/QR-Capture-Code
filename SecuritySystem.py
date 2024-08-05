@@ -259,11 +259,23 @@ while(True):
                 del userKey
 
                 if userKeyHash not in approvedUsers:
-                      
+                    
                     approvedUsers.update({userKeyHash : "New User"})
                     printHandler("adding user with passcode hash: "+ userKeyHash)
                     logging.info("New User with passcode hash: " + userKeyHash)
 
+                    currTime = time.time()
+                    stopTime = currTime + stopTime
+                    lcd_string("New User", LCD_LINE1)
+                    lcd_string("Added", LCD_LINE2)
+
+                    while(stopTime > currTime):
+                      ret, frame = cam.read()
+                      currTime = time.time()
+                    
+                    lcd_string("Scan new code", LCD_LINE1)
+                    lcd_string("+++++++++", LCD_LINE2)
+                    
           else:
 
               for userKey in decodeInfo:
